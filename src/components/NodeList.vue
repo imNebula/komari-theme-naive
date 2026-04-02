@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
 import PingChart from '@/components/PingChart.vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useAppStore } from '@/stores/app'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatUptimeWithFormat, getStatus } from '@/utils/helper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
 import { getOSImage, getOSName } from '@/utils/osImageHelper'
 import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
 import { formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, parseTags } from '@/utils/tagHelper'
@@ -110,6 +110,40 @@ const gridStyle = computed(() => {
   return {
     gridTemplateColumns: templateColumns.join(' '),
     gap: columnGap,
+  }
+})
+
+const offlineOverlayContentStyle = computed(() => {
+  const statusIndex = columns.value.indexOf('status')
+  const regionIndex = columns.value.indexOf('region')
+  const nameIndex = columns.value.indexOf('name')
+
+  const startColumn = nameIndex !== -1
+    ? nameIndex + 1
+    : regionIndex !== -1
+      ? regionIndex + 2
+      : statusIndex === -1 ? 1 : statusIndex + 2
+
+  return {
+    gridColumn: `${startColumn} / -1`,
+  }
+})
+
+const offlineOverlayMaskStyle = computed(() => {
+  const statusIndex = columns.value.indexOf('status')
+  return {
+    gridColumn: statusIndex === -1 ? '1 / -1' : `${statusIndex + 2} / -1`,
+  }
+})
+
+const offlineOverlayRegionStyle = computed(() => {
+  const regionIndex = columns.value.indexOf('region')
+  if (regionIndex === -1) {
+    return null
+  }
+
+  return {
+    gridColumn: `${regionIndex + 1} / span 1`,
   }
 })
 
@@ -237,6 +271,10 @@ function getTrafficUsed(node: NodeData): number {
   }
 }
 
+function formatOfflineTime(node: NodeData): string {
+  return formatDateTime(node.time)
+}
+
 // 根据过期状态获取颜色
 function getExpireBadgeColor(status: string): string {
   switch (status) {
@@ -333,7 +371,14 @@ const columnTitles: Record<string, string> = {
           </template>
         </div>
       </template>
-      <NListItem v-for="node in sortedNodes" :key="node.uuid" :class="{ 'opacity-50 pointer-events-none': !node.online }" :style="rowHeightStyle" @click="handleClick(node)">
+      <NListItem
+        v-for="node in sortedNodes"
+        :key="node.uuid"
+        class="node-list-row"
+        :class="{ 'node-list-row--offline': !node.online }"
+        :style="rowHeightStyle"
+        @click="handleClick(node)"
+      >
         <div class="node-list-item" :style="gridStyle">
           <template v-for="col in columns" :key="col">
             <!-- 在线状态指示器 -->
@@ -509,6 +554,24 @@ const columnTitles: Record<string, string> = {
             </div>
           </template>
         </div>
+        <div v-if="!node.online" class="node-offline-overlay" aria-hidden="true">
+          <div class="node-offline-overlay__grid" :style="gridStyle">
+            <div class="node-offline-overlay__mask" :style="offlineOverlayMaskStyle" />
+            <div v-if="offlineOverlayRegionStyle" class="node-offline-overlay__region" :style="offlineOverlayRegionStyle">
+              <NIcon size="18" class="node-offline-overlay__flag shrink-0">
+                <img :src="getFlagSrc(node.region)" :alt="getRegionDisplayName(node.region)" class="rounded-sm">
+              </NIcon>
+            </div>
+            <div class="node-offline-overlay__content" :style="offlineOverlayContentStyle">
+              <NText class="node-offline-overlay__name text-sm font-semibold truncate">
+                {{ node.name }}
+              </NText>
+              <NText :depth="3" class="node-offline-overlay__time text-xs" :style="{ fontFamily: appStore.numberFontFamily }">
+                最后在线 {{ formatOfflineTime(node) }}
+              </NText>
+            </div>
+          </div>
+        </div>
       </NListItem>
     </NList>
 
@@ -544,6 +607,82 @@ const columnTitles: Record<string, string> = {
 .node-list-item {
   display: grid;
   align-items: center;
+}
+
+.node-list-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.node-offline-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 8px 16px;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.node-list-row:hover .node-offline-overlay {
+  opacity: 0;
+}
+
+.node-offline-overlay__grid {
+  display: grid;
+  height: 100%;
+  align-items: stretch;
+}
+
+.node-offline-overlay__mask,
+.node-offline-overlay__region,
+.node-offline-overlay__content {
+  grid-row: 1;
+}
+
+.node-offline-overlay__mask {
+  align-self: stretch;
+  height: 100%;
+  background-color: color-mix(in srgb, var(--n-color) 76%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.node-offline-overlay__region,
+.node-offline-overlay__content {
+  position: relative;
+  z-index: 1;
+}
+
+.node-offline-overlay__region {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+}
+
+.node-offline-overlay__content {
+  display: flex;
+  align-self: center;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.node-offline-overlay__name {
+  min-width: 0;
+  max-width: min(40%, 280px);
+}
+
+.node-offline-overlay__flag {
+  flex-shrink: 0;
+}
+
+.node-offline-overlay__time {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .node-list-header {

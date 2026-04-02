@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
 import PingChart from '@/components/PingChart.vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useAppStore } from '@/stores/app'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatUptimeWithFormat, getStatus } from '@/utils/helper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
 import { getOSImage, getOSName } from '@/utils/osImageHelper'
 import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
 import { formatPriceWithCycle, getDaysUntilExpired, getExpireStatus, getExpireStatusHexColor, parseTags } from '@/utils/tagHelper'
@@ -30,6 +30,7 @@ const showPingChart = ref(false)
 const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
 const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, appStore.uptimeFormat)
+const offlineTime = computed(() => formatDateTime(props.node.time))
 
 // 计算统计信息
 const cpuStatus = computed(() => getStatus(props.node.cpu ?? 0))
@@ -162,7 +163,7 @@ const cardBlurClass = computed(() => {
     <NCard
       hoverable
       class="node-card w-full cursor-pointer transition-all duration-200" :class="[
-        props.node.online ? 'hover:border-primary' : 'opacity-50 pointer-events-none',
+        props.node.online ? 'hover:border-primary' : 'node-card--offline',
         { 'light-card-contrast': appStore.lightCardContrast && !appStore.isDark },
         { 'glass-card-enabled': hasBackgroundBlur },
         cardBlurClass,
@@ -222,6 +223,34 @@ const cardBlurClass = computed(() => {
         </div>
       </template>
       <template #default>
+        <div v-if="!props.node.online" class="node-offline-overlay" aria-hidden="true">
+          <div class="node-offline-overlay__content">
+            <div class="node-offline-overlay__header flex gap-2 min-w-0 items-center justify-center">
+              <NIcon class="shrink-0">
+                <img :src="`/images/flags/${getRegionCode(props.node.region)}.svg`" :alt="getRegionDisplayName(props.node.region)">
+              </NIcon>
+              <NText class="text-base font-semibold text-center break-all">
+                {{ props.node.name }}
+              </NText>
+            </div>
+            <NText class="text-sm text-red-500 font-medium text-center">
+              节点已离线
+            </NText>
+            <NText :depth="3" class="text-xs text-center" :style="{ fontFamily: appStore.numberFontFamily }">
+              最后在线 {{ offlineTime }}
+            </NText>
+            <div v-if="!appStore.tagsInSeparateRow && priceTags.length > 0" class="node-offline-overlay__tags flex flex-wrap gap-1 items-center justify-center">
+              <NTag
+                v-for="(tag, index) in priceTags"
+                :key="index"
+                size="small"
+                :color="{ color: `${tag.color}20`, textColor: tag.color, borderColor: `${tag.color}40` }"
+              >
+                {{ tag.text }}
+              </NTag>
+            </div>
+          </div>
+        </div>
         <div class="flex flex-col gap-4">
           <!-- 操作系统 -->
           <div class="flex-between">
@@ -399,6 +428,48 @@ const cardBlurClass = computed(() => {
 </template>
 
 <style scoped lang="scss">
+.node-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.node-offline-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--n-border-color) 72%, transparent);
+  background-color: color-mix(in srgb, var(--n-color) 76%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transition: opacity 200ms ease;
+}
+
+.node-card:hover .node-offline-overlay {
+  opacity: 0;
+}
+
+.node-offline-overlay__content {
+  display: flex;
+  max-width: 100%;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.node-offline-overlay__header {
+  max-width: 100%;
+}
+
+.node-offline-overlay__tags {
+  max-width: 100%;
+}
+
 .n-card .shrink-0.n-icon ~ .flex.shrink-0.has-tags {
   position: absolute;
   backdrop-filter: blur(8px);
