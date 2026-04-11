@@ -132,6 +132,7 @@ interface PingRecordsResponse {
 const remoteData = shallowRef<PingRecord[]>([])
 const tasks = shallowRef<TaskInfo[]>([])
 const loading = ref(false)
+const updating = ref(false)
 const error = ref<string | null>(null)
 
 // 任务选择
@@ -146,7 +147,14 @@ async function fetchRecords() {
   if (!props.uuid)
     return
 
-  loading.value = true
+  // 首次加载使用 loading（显示骨架），后续切换使用 updating（保持旧数据可见）
+  const isFirstLoad = tasks.value.length === 0
+  if (isFirstLoad) {
+    loading.value = true
+  }
+  else {
+    updating.value = true
+  }
   error.value = null
 
   try {
@@ -162,8 +170,19 @@ async function fetchRecords() {
     remoteData.value = records
     tasks.value = result?.tasks || []
 
-    if (tasks.value.length > 0 && selectedTaskIds.value.length === 0) {
-      selectedTaskIds.value = tasks.value.map(t => t.id)
+    // 数据加载后校正选中的任务 ID
+    if (tasks.value.length > 0) {
+      const validIds = new Set(tasks.value.map(t => t.id))
+      if (selectedTaskIds.value.length === 0) {
+        // 首次加载，全选
+        selectedTaskIds.value = tasks.value.map(t => t.id)
+      }
+      else {
+        // 保留仍有效的选中项，移除已不存在的
+        const kept = selectedTaskIds.value.filter(id => validIds.has(id))
+        // 如果所有旧选中项都仍有效，则保持；否则重新全选
+        selectedTaskIds.value = kept.length > 0 ? kept : tasks.value.map(t => t.id)
+      }
     }
   }
   catch (err) {
@@ -173,6 +192,7 @@ async function fetchRecords() {
   }
   finally {
     loading.value = false
+    updating.value = false
   }
 }
 
@@ -493,7 +513,6 @@ const pingChartOption = computed(() => {
 // ==================== 生命周期 ====================
 
 watch(selectedView, () => {
-  selectedTaskIds.value = []
   fetchRecords()
 })
 
@@ -541,6 +560,7 @@ const blurClass = computed(() => {
         :key="view.label"
         :type="selectedView === view.label ? 'primary' : 'default'"
         size="small"
+        class="pill-btn"
         @click="selectedView = view.label"
       >
         {{ view.label }}
@@ -558,7 +578,7 @@ const blurClass = computed(() => {
 
       <template v-else>
         <!-- 最新值统计卡片（可点击切换选中状态） -->
-        <div v-if="latestValues.length > 0" class="gap-3 grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))">
+        <div v-if="latestValues.length > 0" class="gap-3 grid" :class="{ 'ping-chart--updating': updating }" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))">
           <div
             v-for="task in latestValues"
             :key="task.id"
@@ -629,7 +649,7 @@ const blurClass = computed(() => {
                   </div>
                 </NTooltip>
               </div>
-              <div class="text-sm mt-1 flex gap-3 items-center" style="color: var(--n-text-color-3)">
+              <div class="text-sm mt-1 flex gap-3 items-center ping-chart__values" style="color: var(--n-text-color-3)">
                 <span class="font-medium" :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ task.latestValue !== null ? `${Math.round(task.latestValue)} ms` : '-' }}</span>
                 <span class="opacity-60">•</span>
                 <span :style="{ fontFamily: appStore.numberFontFamily }">{{ task.loss.toFixed(1) }}% 丢包</span>
@@ -665,7 +685,7 @@ const blurClass = computed(() => {
         </div>
 
         <!-- 图表 -->
-        <div class="h-80">
+        <div class="h-80" :class="{ 'ping-chart--updating': updating }">
           <VChart :option="pingChartOption" autoresize />
         </div>
       </template>
@@ -694,5 +714,17 @@ html.dark .task-card-default {
 
 html.dark .glass-task-enabled {
   background-color: rgba(24, 24, 28, 0.85);
+}
+
+/* 数据更新中的过渡效果 */
+.ping-chart--updating {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+/* 数据值平滑过渡 */
+.ping-chart__values span {
+  transition: opacity 0.2s ease;
 }
 </style>

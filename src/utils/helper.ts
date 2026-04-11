@@ -229,11 +229,19 @@ export function formatUptimeWithFormat(seconds: number, format: UptimeFormat = '
     }
   }
 
-  // 如果没有任何单位有值，显示"不足 1 X"
+  // 如果指定精度范围内没有值，则向下回退到更细单位，避免出现“不足 1 X”
   if (parts.length === 0) {
-    const fallbackUnit = TIME_UNITS[maxUnitIndex]
-    const fallbackLabel = fallbackUnit?.label ?? '秒'
-    return `不足 1 ${fallbackLabel}`
+    for (let i = maxUnitIndex + 1; i < TIME_UNITS.length; i++) {
+      const fallbackUnit = TIME_UNITS[i]
+      if (!fallbackUnit)
+        continue
+
+      const amount = Math.floor(seconds / fallbackUnit.value)
+      if (amount > 0)
+        return `${amount} ${fallbackUnit.label}`
+    }
+
+    return '0 秒'
   }
 
   return parts.join(' ')

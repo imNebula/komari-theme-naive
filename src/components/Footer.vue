@@ -97,7 +97,7 @@ const blurClass = computed(() => {
             Theme by
           </NText>
           <a
-            href="https://github.com/lyimoexiao/komari-theme-naive"
+            href="https://github.com/imNebula/komari-theme-naive"
             target="_blank"
             rel="noopener noreferrer"
             class="text-decoration-none transition-opacity hover:opacity-80"
@@ -109,6 +109,22 @@ const blurClass = computed(() => {
           <NText :depth="3" class="text-xs font-mono ml-1">
             v{{ buildVersion }} ({{ buildGitHash }})
           </NText>
+        </div>
+
+        <div class="flex flex-wrap gap-1 items-center">
+          <NText :depth="3" class="text-sm">
+            Modified from
+          </NText>
+          <a
+            href="https://github.com/lyimoexiao/komari-theme-naive"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-decoration-none transition-opacity hover:opacity-80"
+          >
+            <NText type="primary" class="text-sm font-medium">
+              lyimoexiao/komari-theme-naive
+            </NText>
+          </a>
         </div>
       </div>
 

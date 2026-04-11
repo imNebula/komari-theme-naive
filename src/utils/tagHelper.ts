@@ -225,9 +225,8 @@ export function getExpireStatusHexColor(status: ExpireStatus): string {
     case 'warning':
       return TAG_COLOR_HEX_MAP.orange
     case 'normal':
-      return TAG_COLOR_HEX_MAP.green
     case 'long_term':
-      return TAG_COLOR_HEX_MAP.gray
+      return TAG_COLOR_HEX_MAP.green
     default:
       return TAG_COLOR_HEX_MAP.gray
   }

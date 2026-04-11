@@ -12,12 +12,14 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     Background: typeof import('./src/components/Background.vue')['default']
+    FinanceWidget: typeof import('./src/components/FinanceWidget.vue')['default']
     Footer: typeof import('./src/components/Footer.vue')['default']
     Header: typeof import('./src/components/Header.vue')['default']
     LoadChart: typeof import('./src/components/LoadChart.vue')['default']
     LoadingCover: typeof import('./src/components/LoadingCover.vue')['default']
     LoginDialog: typeof import('./src/components/LoginDialog.vue')['default']
     MarkdownRenderer: typeof import('./src/components/MarkdownRenderer.vue')['default']
+    NButton: typeof import('naive-ui')['NButton']
     NodeCard: typeof import('./src/components/NodeCard.vue')['default']
     NodeGeneralCards: typeof import('./src/components/NodeGeneralCards.vue')['default']
     NodeList: typeof import('./src/components/NodeList.vue')['default']
@@ -26,5 +28,6 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TrafficProgress: typeof import('./src/components/TrafficProgress.vue')['default']
+    VisitorCapsule: typeof import('./src/components/VisitorCapsule.vue')['default']
   }
 }

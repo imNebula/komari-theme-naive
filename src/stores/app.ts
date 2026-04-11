@@ -1,14 +1,17 @@
 import type { MeInfo, PublicSettings } from '@/utils/api'
-import type { ByteDecimalsConfig, UptimeFormat } from '@/utils/helper'
-import { usePreferredDark, useStorageAsync } from '@vueuse/core'
+import type { ByteDecimalsConfig } from '@/utils/helper'
+import { useMediaQuery, usePreferredDark, useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { extractRegionEmojis, getEmojiByCode, getRegionByAlias } from '@/utils/regionHelper'
 
 type ThemeMode = 'auto' | 'light' | 'dark'
 type Lang = 'zh-CN' | 'en-US'
 type NodeViewMode = 'card' | 'list'
+type NodeGroupingMode = 'group' | 'region'
 type RpcTransportMode = 'websocket' | 'http'
 type AlertType = 'default' | 'info' | 'success' | 'warning' | 'error'
+type FinanceCurrency = 'CNY' | 'USD' | 'HKD' | 'EUR' | 'GBP' | 'JPY'
 
 /** 默认的 List 视图列配置 */
 const DEFAULT_LIST_VIEW_COLUMNS = ['status', 'region', 'name', 'tags', 'uptime', 'os', 'cpu', 'mem', 'disk', 'traffic'] as const
@@ -37,6 +40,8 @@ const DEFAULT_BYTE_DECIMALS: ByteDecimalsConfig = {
   TB: 2,
 }
 
+const DEFAULT_REGION_ORDER_CODES = ['HK', 'MO', 'TW', 'JP', 'KR', 'SG', 'US', 'CA', 'GB', 'DE', 'FR', 'NL', 'AU', 'CN']
+
 const useAppStore = defineStore('app', () => {
   const loading = ref<boolean>(true)
 
@@ -49,12 +54,14 @@ const useAppStore = defineStore('app', () => {
   const isLoggedIn = ref<boolean>(false)
   const connectionError = ref<boolean>(false)
   const requireLogin = ref<boolean>(false)
+  const financePanelVisible = ref<boolean>(false)
 
   // 首页滚动位置记忆
   const homeScrollPosition = ref<number>(0)
 
   // 使用 null 表示未设置，等待主题配置加载后决定
   const storedViewMode = useStorageAsync<NodeViewMode | null>('nodeViewMode', null, localStorage)
+  const storedNodeGroupingMode = useStorageAsync<NodeGroupingMode | null>('nodeGroupingMode', null, localStorage)
 
   // 计算属性：从主题配置获取默认视图模式
   const defaultViewMode = computed<NodeViewMode>(() => {
@@ -68,9 +75,102 @@ const useAppStore = defineStore('app', () => {
     return 'card'
   })
 
+  // 计算属性：从主题配置获取移动端默认视图模式
+  const mobileDefaultViewMode = computed<NodeViewMode>(() => {
+    const settings = publicSettings.value?.theme_settings
+    if (settings && typeof settings.mobileDefaultViewMode === 'string') {
+      const mode = settings.mobileDefaultViewMode
+      if (mode === 'card' || mode === 'list') {
+        return mode
+      }
+    }
+    return 'list'
+  })
+
+  // 使用 VueUse 的 useMediaQuery 检测移动端视口
+  const isMobile = useMediaQuery('(max-width: 768px)')
+
+  const defaultGroupingMode = computed<NodeGroupingMode>(() => {
+    const settings = publicSettings.value?.theme_settings
+    if (settings && typeof settings.defaultGroupingMode === 'string') {
+      const mode = settings.defaultGroupingMode
+      if (mode === 'group' || mode === 'region') {
+        return mode
+      }
+    }
+    return 'group'
+  })
+
+  const regionDisplayOrder = computed<string[]>(() => {
+    const settings = publicSettings.value?.theme_settings
+    const rawValue = settings?.regionDisplayOrder
+
+    const defaultOrder = DEFAULT_REGION_ORDER_CODES.map(code => getEmojiByCode(code))
+      .filter(value => value && value.length <= 4)
+
+    if (typeof rawValue !== 'string' || !rawValue.trim()) {
+      return defaultOrder
+    }
+
+    let tokens: string[] = []
+
+    try {
+      const parsed = JSON.parse(rawValue)
+      if (Array.isArray(parsed)) {
+        tokens = parsed.filter((item): item is string => typeof item === 'string')
+      }
+    }
+    catch {
+      tokens = rawValue.split(/[\n,，]+/)
+    }
+
+    if (tokens.length === 0) {
+      return defaultOrder
+    }
+
+    const resolved: string[] = []
+    const seen = new Set<string>()
+
+    tokens.forEach((token) => {
+      const value = token.trim()
+      if (!value)
+        return
+
+      const emojis = extractRegionEmojis(value)
+      if (emojis.length > 0) {
+        emojis.forEach((emoji) => {
+          if (!seen.has(emoji)) {
+            seen.add(emoji)
+            resolved.push(emoji)
+          }
+        })
+        return
+      }
+
+      const region = getRegionByAlias(value)
+      if (region && !seen.has(region.emoji)) {
+        seen.add(region.emoji)
+        resolved.push(region.emoji)
+        return
+      }
+
+      const emojiByCode = getEmojiByCode(value)
+      if (emojiByCode !== value && !seen.has(emojiByCode)) {
+        seen.add(emojiByCode)
+        resolved.push(emojiByCode)
+      }
+    })
+
+    return resolved.length > 0 ? resolved : defaultOrder
+  })
+
   // 校验视图模式是否为合法值
   function isValidViewMode(value: string | null): value is NodeViewMode {
     return value === 'card' || value === 'list'
+  }
+
+  function isValidNodeGroupingMode(value: string | null): value is NodeGroupingMode {
+    return value === 'group' || value === 'region'
   }
 
   // 当前实际使用的视图模式
@@ -80,10 +180,26 @@ const useAppStore = defineStore('app', () => {
       if (storedViewMode.value !== null && isValidViewMode(storedViewMode.value)) {
         return storedViewMode.value
       }
+      // 移动端使用移动端默认视图模式
+      if (isMobile.value) {
+        return mobileDefaultViewMode.value
+      }
       return defaultViewMode.value
     },
     set: (val) => {
       storedViewMode.value = val
+    },
+  })
+
+  const nodeGroupingMode = computed<NodeGroupingMode>({
+    get: () => {
+      if (storedNodeGroupingMode.value !== null && isValidNodeGroupingMode(storedNodeGroupingMode.value)) {
+        return storedNodeGroupingMode.value
+      }
+      return defaultGroupingMode.value
+    },
+    set: (val) => {
+      storedNodeGroupingMode.value = val
     },
   })
 
@@ -123,18 +239,6 @@ const useAppStore = defineStore('app', () => {
       return settings.maxPageWidth.trim()
     }
     return '1800px'
-  })
-
-  // 计算属性：卡片进度条布局配置
-  const cardProgressLayout = computed<'1col' | '2col'>(() => {
-    const settings = publicSettings.value?.theme_settings
-    if (settings && typeof settings.cardProgressLayout === 'string') {
-      const layout = settings.cardProgressLayout
-      if (layout === '1col' || layout === '2col') {
-        return layout
-      }
-    }
-    return '2col'
   })
 
   // 计算属性：数字字体配置
@@ -341,21 +445,7 @@ const useAppStore = defineStore('app', () => {
     if (settings && typeof settings.uptimeTagWrap === 'boolean') {
       return settings.uptimeTagWrap
     }
-    return false
-  })
-
-  // 计算属性：运行时间格式配置
-  const uptimeFormat = computed<UptimeFormat>(() => {
-    const settings = publicSettings.value?.theme_settings
-    const validFormats: UptimeFormat[] = ['day', 'hour', 'minute', 'second']
-
-    if (settings && typeof settings.uptimeFormat === 'string') {
-      const format = settings.uptimeFormat as UptimeFormat
-      if (validFormats.includes(format)) {
-        return format
-      }
-    }
-    return 'day'
+    return true
   })
 
   // 计算属性：亮色模式卡片高对比度
@@ -439,6 +529,45 @@ const useAppStore = defineStore('app', () => {
       return settings.alertContent
     }
     return ''
+  })
+
+  // 计算属性：悬浮挂件配置
+  const visitorCapsuleEnabled = computed<boolean>(() => {
+    const settings = publicSettings.value?.theme_settings
+    if (settings && typeof settings.visitorCapsuleEnabled === 'boolean') {
+      return settings.visitorCapsuleEnabled
+    }
+    return true
+  })
+
+  const visitorCapsuleAutoHideSeconds = computed<number>(() => {
+    const settings = publicSettings.value?.theme_settings
+    if (settings && typeof settings.visitorCapsuleAutoHideSeconds === 'number' && settings.visitorCapsuleAutoHideSeconds >= 0) {
+      return settings.visitorCapsuleAutoHideSeconds
+    }
+    return 5
+  })
+
+  const financeWidgetEnabled = computed<boolean>(() => {
+    const settings = publicSettings.value?.theme_settings
+    if (settings && typeof settings.financeWidgetEnabled === 'boolean') {
+      return settings.financeWidgetEnabled
+    }
+    return true
+  })
+
+  const financeDefaultCurrency = computed<FinanceCurrency>(() => {
+    const settings = publicSettings.value?.theme_settings
+    const validCurrencies: FinanceCurrency[] = ['CNY', 'USD', 'HKD', 'EUR', 'GBP', 'JPY']
+
+    if (settings && typeof settings.financeDefaultCurrency === 'string') {
+      const currency = settings.financeDefaultCurrency as FinanceCurrency
+      if (validCurrencies.includes(currency)) {
+        return currency
+      }
+    }
+
+    return 'CNY'
   })
 
   // 计算属性：ICP 备案配置
@@ -552,13 +681,6 @@ const useAppStore = defineStore('app', () => {
     return 0
   })
 
-  // 当 publicSettings 加载后，如果 localStorage 没有保存过视图模式或值为非法值，使用默认值
-  watch(publicSettings, (settings) => {
-    if (settings && !isValidViewMode(storedViewMode.value)) {
-      // 触发 computed setter，会自动保存到 localStorage
-      storedViewMode.value = defaultViewMode.value
-    }
-  }, { immediate: true })
 
   // 使用 VueUse 的 usePreferredDark 检测系统主题偏好
   const prefersDark = usePreferredDark()
@@ -608,6 +730,18 @@ const useAppStore = defineStore('app', () => {
     isLoggedIn.value = false
   }
 
+  function openFinancePanel() {
+    financePanelVisible.value = true
+  }
+
+  function closeFinancePanel() {
+    financePanelVisible.value = false
+  }
+
+  function toggleFinancePanel() {
+    financePanelVisible.value = !financePanelVisible.value
+  }
+
   return {
     loading,
     themeMode,
@@ -615,12 +749,16 @@ const useAppStore = defineStore('app', () => {
     lang,
     nodeSelectedGroup,
     nodeViewMode,
+    nodeGroupingMode,
     defaultViewMode,
+    mobileDefaultViewMode,
+    isMobile,
+    defaultGroupingMode,
+    regionDisplayOrder,
     rpcTransportMode,
     showLoginButton,
     fullWidth,
     maxPageWidth,
-    cardProgressLayout,
     numberFontFamily,
     listViewColumns,
     hideSingleGroupTab,
@@ -634,7 +772,6 @@ const useAppStore = defineStore('app', () => {
     showPingChartButton,
     tagsInSeparateRow,
     uptimeTagWrap,
-    uptimeFormat,
     lightCardContrast,
     trafficSplitColor,
     byteDecimals,
@@ -642,6 +779,11 @@ const useAppStore = defineStore('app', () => {
     alertType,
     alertTitle,
     alertContent,
+    visitorCapsuleEnabled,
+    visitorCapsuleAutoHideSeconds,
+    financeWidgetEnabled,
+    financeDefaultCurrency,
+    financePanelVisible,
     icpEnabled,
     icpNumber,
     icpUrl,
@@ -662,6 +804,9 @@ const useAppStore = defineStore('app', () => {
     connectionError,
     requireLogin,
     homeScrollPosition,
+    openFinancePanel,
+    closeFinancePanel,
+    toggleFinancePanel,
     updateThemeMode,
     updateLang,
     setUserInfo,

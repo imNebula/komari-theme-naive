@@ -217,7 +217,11 @@ async function fetchHistoryData() {
 
   const hours = selectedHours.value || 4
 
-  loading.value = true
+  // 首次加载显示 loading，后续切换保持旧数据可见
+  const isFirstLoad = remoteData.value.length === 0
+  if (isFirstLoad) {
+    loading.value = true
+  }
   error.value = null
 
   try {
@@ -864,6 +868,7 @@ onMounted(() => {
         :key="view.label"
         :type="selectedView === view.label ? 'primary' : 'default'"
         size="small"
+        class="pill-btn"
         @click="selectedView = view.label"
       >
         {{ view.label }}

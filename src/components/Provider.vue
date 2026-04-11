@@ -78,7 +78,7 @@ const themeOverride = computed<GlobalThemeOverrides>(() => {
   const settings = appStore.publicSettings?.theme_settings as Record<string, unknown> | undefined
 
   // 通用默认值
-  const borderRadius = (settings?.borderRadius as string) || '3px'
+  const borderRadius = (settings?.borderRadius as string) || '15px'
   const fontFamily = (settings?.fontFamily as string) || '"MiSans VF", sans-serif'
 
   // 根据当前主题模式选择颜色配置
@@ -102,6 +102,9 @@ const themeOverride = computed<GlobalThemeOverrides>(() => {
       primaryColorSuppl: primaryColorHover,
       borderRadius,
       fontFamily,
+    },
+    Tag: {
+      borderRadius,
     },
   }
 })

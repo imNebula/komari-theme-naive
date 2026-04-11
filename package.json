@@ -8,6 +8,14 @@
     "url": "https://github.com/lyimoexiao"
   },
   "license": "MIT",
+  "homepage": "https://github.com/imNebula/komari-theme-naive",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imNebula/komari-theme-naive.git"
+  },
+  "bugs": {
+    "url": "https://github.com/imNebula/komari-theme-naive/issues"
+  },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },

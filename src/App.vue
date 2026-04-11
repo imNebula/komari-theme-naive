@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import Background from './components/Background.vue'
+import FinanceWidget from './components/FinanceWidget.vue'
 import Footer from './components/Footer.vue'
 import Header from './components/Header.vue'
 import LoadingCover from './components/LoadingCover.vue'
 import Provider from './components/Provider.vue'
+import VisitorCapsule from './components/VisitorCapsule.vue'
 import { useAppStore } from './stores/app'
 import { destroyInitManager, initApp } from './utils/init'
 
@@ -79,6 +81,8 @@ onUnmounted(() => {
         </RouterView>
       </div>
     </main>
+    <VisitorCapsule v-if="!appStore.loading && appStore.visitorCapsuleEnabled" />
+    <FinanceWidget v-if="!appStore.loading && appStore.financeWidgetEnabled" />
     <Footer v-if="!appStore.loading" />
   </Provider>
 </template>

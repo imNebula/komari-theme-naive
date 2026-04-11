@@ -99,7 +99,7 @@ const columns = computed(() => appStore.listViewColumns)
 // 格式化函数
 const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
-const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, appStore.uptimeFormat)
+const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, 'hour')
 
 // 动态生成 grid 样式，使用配置的列宽度和间距
 const gridStyle = computed(() => {
@@ -688,7 +688,6 @@ const columnTitles: Record<string, string> = {
 .node-list-header {
   padding: 8px 16px;
   background-color: var(--n-color-hover);
-  border-radius: var(--n-border-radius);
 }
 
 .node-list-header__status,
