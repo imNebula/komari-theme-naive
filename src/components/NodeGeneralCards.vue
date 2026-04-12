@@ -230,18 +230,19 @@ html.dark .glass-card-enabled {
 
 .general-card__content {
   height: 100%;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.625rem;
   text-align: center;
 }
 
 .general-card__content--split {
-  justify-content: center;
   width: 100%;
-  padding-block: 0.5rem;
+  /* Top padding shifts the visual center downward; bottom reserves space for the label */
+  padding-top: 0.75rem;
+  padding-bottom: 2rem;
 }
 
 .general-card__content--combined {
@@ -255,16 +256,14 @@ html.dark .glass-card-enabled {
   line-height: 1.25;
 }
 
-.general-card__content--split > .general-card__primary {
-  margin-top: auto;
-}
-
-.general-card__content--split > .general-card__primary.flex {
-  margin-top: auto;
-}
-
+/* Label pinned to bottom of card */
 .general-card__content--split > .general-card__label {
-  margin-top: auto;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
 }
 
 .general-card__time-block {
@@ -352,6 +351,7 @@ html.dark .glass-card-enabled {
   flex-direction: column;
   gap: 0.75rem;
   width: 100%;
+  height: 100%;
 }
 
 .general-card__section {
@@ -359,7 +359,10 @@ html.dark .glass-card-enabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  flex: 1;
+  /* Reserve space at bottom for section title */
+  padding-bottom: 1.75rem;
 }
 
 .general-card__section:not(:last-child)::after {
@@ -372,8 +375,13 @@ html.dark .glass-card-enabled {
   background: color-mix(in srgb, var(--n-border-color) 55%, transparent);
 }
 
+/* Section title pinned to bottom */
 .general-card__section-title {
-  display: inline-flex;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
@@ -390,7 +398,7 @@ html.dark .glass-card-enabled {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
-    align-items: start;
+    align-items: stretch;
   }
 
   .general-card--combined .general-card__section:not(:last-child)::after {
@@ -418,12 +426,8 @@ html.dark .glass-card-enabled {
     gap: 1rem;
   }
 
-  .general-card__content {
-    gap: 0.85rem;
-  }
-
   .general-card__content--split {
-    padding-block: 0.5rem;
+    padding-bottom: 2.25rem;
   }
 
   .general-card__primary {
@@ -480,7 +484,7 @@ html.dark .glass-card-enabled {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
-    align-items: start;
+    align-items: stretch;
   }
 
   .general-card__section:not(:last-child)::after {

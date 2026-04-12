@@ -123,6 +123,9 @@ watch(
     if (overrides.common?.primaryColorPressed) {
       root.style.setProperty('--primary-color-pressed', overrides.common.primaryColorPressed)
     }
+    if (overrides.common?.borderRadius) {
+      root.style.setProperty('--n-border-radius', overrides.common.borderRadius)
+    }
   },
   { immediate: true },
 )

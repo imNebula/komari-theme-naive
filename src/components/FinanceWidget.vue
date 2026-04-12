@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'vue'
 import type { NodeData } from '@/stores/nodes'
 import type { SupportedCurrency } from '@/utils/finance'
-import { useStorage } from '@vueuse/core'
+import { onClickOutside, useStorage } from '@vueuse/core'
 import { NModal, NSelect, NTooltip, useThemeVars } from 'naive-ui'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
@@ -37,7 +37,9 @@ const themeVars = useThemeVars()
 
 const mounted = ref(false)
 const tradeModalVisible = ref(false)
+const panelRef = ref<HTMLElement | null>(null)
 const selectedNodeId = ref<string | null>(null)
+const cachedNode = ref<NodeData | null>(null)
 const tradeDate = ref('')
 const tradeAmount = ref('')
 const exchangeRates = ref<Record<SupportedCurrency, number>>({ ...DEFAULT_EXCHANGE_RATES })
@@ -82,11 +84,6 @@ const sortOptions = computed(() => [
   { label: '价格 倒序', value: 'price_desc' },
 ])
 
-const selectedNode = computed(() => {
-  if (!selectedNodeId.value)
-    return null
-  return nodesStore.nodes.find(node => node.uuid === selectedNodeId.value) ?? null
-})
 
 const currencyRateItems = computed(() => {
   return SUPPORTED_CURRENCIES
@@ -180,10 +177,11 @@ const tradeDatePoint = computed(() => {
 })
 
 const tradeAmountValue = computed<number | null>(() => {
-  if (!tradeAmount.value.trim())
+  const strValue = String(tradeAmount.value).trim()
+  if (!strValue)
     return null
 
-  const amount = Number(tradeAmount.value)
+  const amount = Number(strValue)
   if (!Number.isFinite(amount) || amount < 0)
     return null
 
@@ -191,10 +189,10 @@ const tradeAmountValue = computed<number | null>(() => {
 })
 
 const tradeRemainingValue = computed(() => {
-  if (!selectedNode.value)
+  if (!cachedNode.value)
     return 0
 
-  const remainCny = calculateRemainingValueCny(selectedNode.value, exchangeRates.value, tradeDatePoint.value)
+  const remainCny = calculateRemainingValueCny(cachedNode.value, exchangeRates.value, tradeDatePoint.value)
   return convertCnyToCurrency(remainCny, selectedCurrency.value, exchangeRates.value)
 })
 
@@ -302,7 +300,12 @@ function closePanel() {
 }
 
 function openTradeModal(nodeId: string) {
+  const node = nodesStore.nodes.find(n => n.uuid === nodeId)
+  if (!node)
+    return
+
   selectedNodeId.value = nodeId
+  cachedNode.value = { ...node }
   tradeDate.value = formatDateInput(new Date())
   tradeAmount.value = ''
   tradeModalVisible.value = true
@@ -310,6 +313,7 @@ function openTradeModal(nodeId: string) {
 
 function closeTradeModal() {
   tradeModalVisible.value = false
+  cachedNode.value = null
 }
 
 watch(selectedCurrency, (value) => {
@@ -322,10 +326,18 @@ watch(sortMode, (value) => {
     sortMode.value = 'weight_asc'
 }, { immediate: true })
 
-watch(selectedNode, (value) => {
-  if (!value)
-    tradeModalVisible.value = false
-})
+onClickOutside(panelRef, (e) => {
+  // 1. 如果说明面板打开，不处理
+  if (!panelVisible.value) return
+  // 2. 如果交易模态框打开了，不处理（防止在模态框里点其他地方导致底下面板被关）
+  if (tradeModalVisible.value) return
+
+  const target = e.target as HTMLElement
+  // 3. 如果点击了 Naive UI 的弹出层（如 Select 下拉菜单、Tooltip），不关闭
+  if (target.closest('.v-binder-follower-container')) return
+  // 4. 关闭面板
+  appStore.closeFinancePanel()
+}, { ignore: ['.header-action-btn--finance'] })
 
 onMounted(() => {
   mounted.value = true
@@ -343,7 +355,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Transition name="finance-panel">
-    <aside v-if="mounted && panelVisible" class="finance-widget" :style="surfaceStyle">
+    <aside v-if="mounted && panelVisible" ref="panelRef" class="finance-widget" :style="surfaceStyle">
       <div class="finance-widget__header">
         <div class="finance-widget__title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -490,7 +502,7 @@ onBeforeUnmount(() => {
   </Transition>
 
   <NModal v-model:show="tradeModalVisible" :mask-closable="false" :trap-focus="true" :auto-focus="false">
-    <div v-if="selectedNode" class="finance-trade-modal" :style="surfaceStyle">
+    <div v-if="cachedNode" class="finance-trade-modal" :style="surfaceStyle">
       <div class="finance-trade-modal__header">
         <div class="finance-trade-modal__title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -514,35 +526,35 @@ onBeforeUnmount(() => {
           <div class="finance-trade-modal__grid">
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">名称</span>
-              <span class="finance-trade-modal__value">{{ selectedNode.name }}</span>
+              <span class="finance-trade-modal__value">{{ cachedNode.name }}</span>
             </div>
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">CPU</span>
-              <span class="finance-trade-modal__value">{{ selectedNode.cpu_name || '未知' }}</span>
+              <span class="finance-trade-modal__value">{{ cachedNode.cpu_name || '未知' }}</span>
             </div>
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">核心数</span>
-              <span class="finance-trade-modal__value finance-widget__number">{{ selectedNode.cpu_cores ? `${selectedNode.cpu_cores} 核` : '未知' }}</span>
+              <span class="finance-trade-modal__value finance-widget__number">{{ cachedNode.cpu_cores ? `${cachedNode.cpu_cores} 核` : '未知' }}</span>
             </div>
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">内存</span>
-              <span class="finance-trade-modal__value finance-widget__number">{{ selectedNode.mem_total ? formatBytesWithConfig(selectedNode.mem_total, appStore.byteDecimals) : '未知' }}</span>
+              <span class="finance-trade-modal__value finance-widget__number">{{ cachedNode.mem_total ? formatBytesWithConfig(cachedNode.mem_total, appStore.byteDecimals) : '未知' }}</span>
             </div>
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">硬盘</span>
-              <span class="finance-trade-modal__value finance-widget__number">{{ selectedNode.disk_total ? formatBytesWithConfig(selectedNode.disk_total, appStore.byteDecimals) : '未知' }}</span>
+              <span class="finance-trade-modal__value finance-widget__number">{{ cachedNode.disk_total ? formatBytesWithConfig(cachedNode.disk_total, appStore.byteDecimals) : '未知' }}</span>
             </div>
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">流量</span>
-              <span class="finance-trade-modal__value finance-widget__number">{{ formatTraffic(selectedNode) }}</span>
+              <span class="finance-trade-modal__value finance-widget__number">{{ formatTraffic(cachedNode) }}</span>
             </div>
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">原价</span>
-              <span class="finance-trade-modal__value finance-widget__number">{{ formatPriceWithCycle(selectedNode.price, selectedNode.billing_cycle, selectedNode.currency, appStore.lang) }}</span>
+              <span class="finance-trade-modal__value finance-widget__number">{{ formatPriceWithCycle(cachedNode.price, cachedNode.billing_cycle, cachedNode.currency, appStore.lang) }}</span>
             </div>
             <div class="finance-trade-modal__info">
               <span class="finance-trade-modal__label">到期时间</span>
-              <span class="finance-trade-modal__value finance-widget__number">{{ formatExpiredDate(selectedNode.expired_at) }}</span>
+              <span class="finance-trade-modal__value finance-widget__number">{{ formatExpiredDate(cachedNode.expired_at) }}</span>
             </div>
           </div>
         </section>
@@ -600,7 +612,7 @@ onBeforeUnmount(() => {
   width: 19rem;
   max-width: calc(100vw - 2rem);
   border: 1px solid var(--finance-border);
-  border-radius: 1rem;
+  border-radius: var(--n-border-radius);
   background: var(--finance-bg);
   color: var(--finance-text);
   box-shadow: var(--finance-shadow);
@@ -752,7 +764,7 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 0.45rem 0.55rem;
   border: 1px solid transparent;
-  border-radius: 0.75rem;
+  border-radius: var(--n-border-radius);
   background: transparent;
   color: inherit;
   display: flex;
@@ -973,7 +985,7 @@ onBeforeUnmount(() => {
   height: 2.4rem;
   padding: 0 0.8rem;
   border: 1px solid var(--finance-border);
-  border-radius: 0.75rem;
+  border-radius: var(--n-border-radius);
   background: var(--finance-soft-bg);
   color: var(--finance-text);
   outline: none;

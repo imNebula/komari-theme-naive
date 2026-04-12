@@ -39,6 +39,18 @@ const chartColors = [
   '#F472B6', // 粉红色
   '#34D399', // 翠绿色
   '#FB923C', // 橙色
+  '#818CF8', // 靛蓝色
+  '#FBBF24', // 金黄色
+  '#38BDF8', // 亮蓝色
+  '#A3E635', // 柠檬绿
+  '#FB7185', // 玫瑰红
+  '#2DD4BF', // 绿松石
+  '#C084FC', // 亮紫色
+  '#F43F5E', // 树莓红
+  '#10B981', // 深翠绿
+  '#8B5CF6', // 蓝紫色
+  '#EAB308', // 姜黄色
+  '#06B6D4', // 青蓝色
 ]
 
 // 从 publicSettings 获取记录保留时间
@@ -139,9 +151,27 @@ const error = ref<string | null>(null)
 const selectedTaskIds = ref<number[]>([])
 const cutPeak = ref(false)
 
-const chartMargin = { top: 12, right: 24, bottom: 52, left: 56 }
+const chartRef = ref<InstanceType<typeof VChart> | null>(null)
+const userYAxisMax = ref<number | null>(null)
+
+const chartMargin = { top: 32, right: 24, bottom: 84, left: 56 }
 
 // ==================== 数据获取 ====================
+
+function handleChartClick(params: any) {
+  const chart = chartRef.value
+  if (!chart || typeof chart.containPixel !== 'function') return
+
+  const pointInPixel = [params.offsetX, params.offsetY]
+  if (chart.containPixel('grid', pointInPixel)) {
+    const pointInGrid = chart.convertFromPixel('grid', pointInPixel) as [number, number]
+    const clickedY = pointInGrid[1]
+    
+    if (typeof clickedY === 'number' && clickedY > 0) {
+      userYAxisMax.value = Math.round(clickedY * 10) / 10
+    }
+  }
+}
 
 async function fetchRecords() {
   if (!props.uuid)
@@ -403,10 +433,20 @@ const pingChartOption = computed(() => {
   const data = chartData.value
   const hours = selectedHours.value
 
+  const yAxisMax = userYAxisMax.value
+  let ceilingMax = yAxisMax
+
+  if (yAxisMax !== null) {
+    const laneStep = Math.max(yAxisMax * 0.04, 1)
+    ceilingMax = yAxisMax + taskList.length * laneStep
+  }
+
   // 构建 series，确保颜色与卡片一致
-  const series = taskList.map((task) => {
+  const series = taskList.flatMap((task, idx) => {
     const color = getTaskColor(task.id)
-    return {
+    
+    const mainSeries = {
+      id: 'main-' + task.id,
       name: task.name,
       type: 'line' as const,
       data: data.map(d => d[task.id] as number | null ?? null),
@@ -416,6 +456,35 @@ const pingChartOption = computed(() => {
       lineStyle: { width: 2.5, color, cap: 'round' as const },
       itemStyle: { color }, // 确保 symbol 颜色一致
     }
+
+    if (yAxisMax !== null) {
+      const laneStep = Math.max(yAxisMax * 0.04, 1)
+      const exceedY = yAxisMax + (idx * laneStep)
+
+      return [
+        mainSeries,
+        {
+          id: 'exceed-' + task.id,
+          name: task.name,
+          type: 'line' as const,
+          data: data.map(d => {
+            const v = d[task.id] as number | null ?? null
+            return (v !== null && v > yAxisMax) ? exceedY : null
+          }),
+          smooth: false,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 3,
+          connectNulls: false,
+          lineStyle: { width: 2, color, type: 'dashed' as const },
+          itemStyle: { color },
+          tooltip: { show: false },
+          hoverAnimation: false,
+        }
+      ]
+    }
+    
+    return [mainSeries]
   })
 
   // 颜色映射表（用于 Tooltip）
@@ -427,6 +496,14 @@ const pingChartOption = computed(() => {
 
   return {
     animation: false,
+    visualMap: yAxisMax === null ? undefined : taskList.map((task, idx) => ({
+      type: 'piecewise',
+      show: false,
+      dimension: 1, // Y轴是维度1
+      seriesIndex: idx * 2, // mainSeries 是每个任务生成的第一个系列
+      pieces: [{ max: yAxisMax, color: getTaskColor(task.id) }],
+      outOfRange: { color: 'transparent' }
+    })),
     // 全局颜色设置（用于图例等）
     color: tasks.value.map((_, idx) => {
       const safeIdx = Math.max(0, idx % chartColors.length)
@@ -435,10 +512,16 @@ const pingChartOption = computed(() => {
     tooltip: {
       ...baseTooltipConfig.value,
       formatter: (params: unknown) => {
-        const p = params as Array<{ seriesName: string, value: number | null, dataIndex: number }>
+        const p = params as Array<{ seriesId?: string, seriesName: string, value: number | null, dataIndex: number }>
         if (!p.length)
           return ''
-        const firstParam = p[0]
+        
+        // 过滤掉用于展示虚线的虚拟系列
+        const validParams = p.filter(item => !item.seriesId?.startsWith('exceed'))
+        if (!validParams.length)
+          return ''
+
+        const firstParam = validParams[0]
         if (!firstParam)
           return ''
         const rowData = data[firstParam.dataIndex]
@@ -450,8 +533,8 @@ const pingChartOption = computed(() => {
         let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
         html += '<div style="display:flex;flex-direction:column;gap:4px">'
 
-        // 按延迟值排序显示
-        const sortedParams = [...p].sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+        // 按延迟真实值排序显示
+        const sortedParams = [...validParams].sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
 
         for (const item of sortedParams) {
           if (item.value !== null && item.value !== undefined) {
@@ -468,7 +551,7 @@ const pingChartOption = computed(() => {
     },
     legend: {
       type: 'scroll',
-      bottom: 4,
+      bottom: 36,
       itemWidth: 12,
       itemHeight: 12,
       itemGap: 16,
@@ -476,6 +559,39 @@ const pingChartOption = computed(() => {
       textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
       data: taskList.map(t => t.name),
     },
+    toolbox: {
+      show: true,
+      right: 16,
+      top: 0,
+      feature: {
+        dataZoom: {
+          yAxisIndex: 'none',
+          title: { zoom: '区域缩放', back: '还原缩放' }
+        }
+      },
+      iconStyle: {
+        borderColor: chartThemeColors.value.textSecondary
+      }
+    },
+    dataZoom: [
+      {
+        type: 'inside',
+        xAxisIndex: 0,
+        filterMode: 'filter',
+        // 限制最多只能放大到查看 20 个数据节点，防止滚轮过猛直接缩到只剩几个点没法看
+        minValueSpan: 20
+      },
+      {
+        type: 'slider',
+        xAxisIndex: 0,
+        bottom: 0,
+        height: 24,
+        minValueSpan: 20,
+        textStyle: { color: chartThemeColors.value.textSecondary },
+        borderColor: chartThemeColors.value.borderColor,
+        fillerColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+      }
+    ],
     grid: chartMargin,
     xAxis: {
       type: 'category',
@@ -495,8 +611,16 @@ const pingChartOption = computed(() => {
     yAxis: {
       type: 'value',
       name: '延迟 (ms)',
+      max: yAxisMax === null ? undefined : ceilingMax,
       nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-      axisLabel: { fontSize: 11, color: chartThemeColors.value.textSecondary, formatter: '{value}' },
+      axisLabel: { 
+        fontSize: 11, 
+        color: chartThemeColors.value.textSecondary, 
+        formatter: (val: number) => {
+          if (yAxisMax !== null && val > yAxisMax) return ''
+          return String(val)
+        }
+      },
       axisLine: { show: false },
       axisTick: { show: false },
       splitLine: {
@@ -666,7 +790,7 @@ const blurClass = computed(() => {
         <div class="flex flex-wrap gap-4 items-center">
           <div class="flex gap-2 items-center">
             <NSwitch v-model:value="cutPeak" size="small" />
-            <span class="text-sm">裁剪峰值</span>
+            <span class="text-sm">平滑曲线</span>
             <NTooltip>
               <template #trigger>
                 <span class="i-carbon-information text-sm opacity-50 cursor-help transition-opacity hover:opacity-100" style="color: var(--n-text-color-3)" />
@@ -681,12 +805,15 @@ const blurClass = computed(() => {
             <NButton size="small" tertiary @click="hideAllTasks">
               全不选
             </NButton>
+            <NButton v-if="userYAxisMax !== null" size="small" type="primary" ghost @click="userYAxisMax = null">
+              还原图表高度
+            </NButton>
           </div>
         </div>
 
         <!-- 图表 -->
         <div class="h-80" :class="{ 'ping-chart--updating': updating }">
-          <VChart :option="pingChartOption" autoresize />
+          <VChart ref="chartRef" :option="pingChartOption" autoresize @zr:click="handleChartClick" />
         </div>
       </template>
     </NSpin>
