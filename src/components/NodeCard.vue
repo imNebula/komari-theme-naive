@@ -29,7 +29,7 @@ const showPingChart = ref(false)
 const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
 const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, 'hour')
-const formatInlineUnit = (value: string) => value.replaceAll(' ', '\u00A0')
+const formatInlineUnit = (value: string) => value.replace(/ /g, '\u00A0')
 const formatBytesInline = (bytes: number) => formatInlineUnit(formatBytes(bytes))
 const formatBytesPerSecondInline = (bytes: number) => formatInlineUnit(formatBytesPerSecond(bytes))
 
