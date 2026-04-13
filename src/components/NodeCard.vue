@@ -29,6 +29,9 @@ const showPingChart = ref(false)
 const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
 const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, 'hour')
+const formatInlineUnit = (value: string) => value.replaceAll(' ', '\u00A0')
+const formatBytesInline = (bytes: number) => formatInlineUnit(formatBytes(bytes))
+const formatBytesPerSecondInline = (bytes: number) => formatInlineUnit(formatBytesPerSecond(bytes))
 
 // 计算统计信息
 const cpuStatus = computed(() => getStatus(props.node.cpu ?? 0))
@@ -317,16 +320,20 @@ const cardBlurClass = computed(() => {
                 </NText>
                 <NTooltip v-if="showTrafficProgress">
                   <template #trigger>
-                    <NText :depth="3" class="node-card__metric-inline-detail cursor-help" :style="{ fontFamily: appStore.numberFontFamily }">
-                      {{ formatBytes(trafficUsed) }} / {{ formatBytes(props.node.traffic_limit) }}
+                    <NText :depth="3" class="node-card__metric-inline-detail node-card__metric-inline-detail--traffic cursor-help" :style="{ fontFamily: appStore.numberFontFamily }">
+                      <span class="node-card__metric-inline-segment">{{ formatBytesInline(trafficUsed) }}</span>
+                      <span class="node-card__metric-inline-separator"> / </span>
+                      <span class="node-card__metric-inline-segment">{{ formatBytesInline(props.node.traffic_limit) }}</span>
                     </NText>
                   </template>
                   <NText class="text-[10px]" :style="{ fontFamily: appStore.numberFontFamily }">
-                    <span :style="{ color: appStore.trafficSplitColor ? themeVars.successColor : themeVars.textColorBase }">↑ {{ formatBytes(props.node.net_total_up ?? 0) }}</span><span class="p-1" /><span :style="{ color: appStore.trafficSplitColor ? themeVars.infoColor : themeVars.textColorBase }">↓ {{ formatBytes(props.node.net_total_down ?? 0) }}</span>
+                    <span class="node-card__metric-inline-segment" :style="{ color: appStore.trafficSplitColor ? themeVars.successColor : themeVars.textColorBase }">↑ {{ formatBytesInline(props.node.net_total_up ?? 0) }}</span><span class="p-1" /><span class="node-card__metric-inline-segment" :style="{ color: appStore.trafficSplitColor ? themeVars.infoColor : themeVars.textColorBase }">↓ {{ formatBytesInline(props.node.net_total_down ?? 0) }}</span>
                   </NText>
                 </NTooltip>
-                <NText v-else :depth="3" class="node-card__metric-inline-detail" :style="{ fontFamily: appStore.numberFontFamily }">
-                  ↑ {{ formatBytes(props.node.net_total_up ?? 0) }} / ↓ {{ formatBytes(props.node.net_total_down ?? 0) }}
+                <NText v-else :depth="3" class="node-card__metric-inline-detail node-card__metric-inline-detail--traffic" :style="{ fontFamily: appStore.numberFontFamily }">
+                  <span class="node-card__metric-inline-segment">↑ {{ formatBytesInline(props.node.net_total_up ?? 0) }}</span>
+                  <span class="node-card__metric-inline-separator"> / </span>
+                  <span class="node-card__metric-inline-segment">↓ {{ formatBytesInline(props.node.net_total_down ?? 0) }}</span>
                 </NText>
                 <NText class="node-card__metric-percent" :style="{ fontFamily: appStore.numberFontFamily }">
                   <template v-if="showTrafficProgress">
@@ -355,7 +362,7 @@ const cardBlurClass = computed(() => {
               网络速率
             </NText>
             <div class="text-[13px] flex gap-1" :style="{ fontFamily: appStore.numberFontFamily }">
-              <span :style="{ color: themeVars.successColor }">↑ {{ formatBytesPerSecond(props.node.net_out ?? 0) }}</span><span class="" /><span :style="{ color: themeVars.infoColor }">↓ {{ formatBytesPerSecond(props.node.net_in ?? 0) }}</span>
+              <span class="node-card__metric-inline-segment" :style="{ color: themeVars.successColor }">↑ {{ formatBytesPerSecondInline(props.node.net_out ?? 0) }}</span><span class="" /><span class="node-card__metric-inline-segment" :style="{ color: themeVars.infoColor }">↓ {{ formatBytesPerSecondInline(props.node.net_in ?? 0) }}</span>
             </div>
           </div>
 
@@ -432,6 +439,7 @@ const cardBlurClass = computed(() => {
 .node-card {
   position: relative;
   overflow: hidden;
+  container-type: inline-size;
 }
 
 .node-card__title-wrap {
@@ -500,6 +508,26 @@ const cardBlurClass = computed(() => {
   line-height: 1.25;
   text-align: left;
   word-break: break-word;
+}
+
+.node-card__metric-inline-detail--traffic {
+  flex-wrap: nowrap;
+  justify-content: center;
+  white-space: nowrap;
+  column-gap: 0;
+  row-gap: 0;
+  word-break: normal;
+  font-size: clamp(0.6rem, 2.1vw, 0.85rem);
+  font-size: clamp(0.56rem, 4.8cqi, 0.85rem);
+  line-height: 1.15;
+}
+
+.node-card__metric-inline-segment {
+  white-space: nowrap;
+}
+
+.node-card__metric-inline-separator {
+  white-space: nowrap;
 }
 
 .node-card__metric-percent {
@@ -631,6 +659,10 @@ html.dark .glass-card-enabled {
     width: min(100%, 9.25rem);
     font-size: 0.76rem;
     line-height: 1.2;
+  }
+
+  .node-card__metric-inline-detail--traffic {
+    font-size: clamp(0.6rem, 2.2vw, 0.78rem);
   }
 
   .node-card__metric-percent {
