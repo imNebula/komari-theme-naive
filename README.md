@@ -1,6 +1,11 @@
 <h3 align="center"> Komari Naive </h3>
 <p align="center">基于 Vue 3 + Vite + Naive UI 构建的 Komari Monitor 主题
 </p>
+<p align="center">
+  本主题基于
+  <a href="https://github.com/lyimoexiao/komari-theme-naive">@lyimoexiao/komari-theme-naive</a>
+  进行修改而来
+</p>
 <a href="https://github.com/imNebula/komari-theme-naive">
 <img src="docs/preview.png" alt="Komari Theme Naive" />
 </a>
