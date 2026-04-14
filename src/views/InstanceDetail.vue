@@ -424,6 +424,25 @@ html.dark .glass-card-enabled {
   color: var(--primary-color);
 }
 
+html.dark .instance-detail__pill-btn {
+  border-color: rgba(148, 163, 184, 0.26);
+  background: color-mix(in srgb, rgba(15, 23, 42, 0.92) 84%, transparent);
+  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.3);
+  color: rgba(226, 232, 240, 0.92);
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 34%, rgba(148, 163, 184, 0.26));
+    box-shadow: 0 12px 28px rgba(2, 6, 23, 0.42);
+  }
+}
+
+html.dark .instance-detail__pill-btn--active {
+  border-color: color-mix(in srgb, var(--primary-color) 48%, rgba(148, 163, 184, 0.24));
+  background: color-mix(in srgb, var(--primary-color) 22%, rgba(15, 23, 42, 0.92));
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.38);
+  color: color-mix(in srgb, var(--primary-color) 84%, #e2e8f0);
+}
+
 .instance-detail__hardware-layout {
   height: 100%;
   display: flex;
