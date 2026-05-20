@@ -14,7 +14,7 @@ type AlertType = 'default' | 'info' | 'success' | 'warning' | 'error'
 type FinanceCurrency = 'CNY' | 'USD' | 'HKD' | 'EUR' | 'GBP' | 'JPY'
 
 /** 默认的 List 视图列配置 */
-const DEFAULT_LIST_VIEW_COLUMNS = ['status', 'region', 'name', 'tags', 'uptime', 'os', 'cpu', 'mem', 'disk', 'traffic'] as const
+const DEFAULT_LIST_VIEW_COLUMNS = ['status', 'region', 'name', 'tags', 'uptime', 'os', 'cpu', 'mem', 'disk', 'traffic', 'rate'] as const
 type ListViewColumn = typeof DEFAULT_LIST_VIEW_COLUMNS[number]
 
 /** 默认的 List 视图列宽度配置 */
@@ -29,6 +29,7 @@ const DEFAULT_LIST_COLUMN_WIDTHS: Record<string, string> = {
   mem: '180px',
   disk: '180px',
   traffic: '180px',
+  rate: '140px',
 }
 
 /** 默认的字节精度配置 */

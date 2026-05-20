@@ -87,6 +87,11 @@ const sortedNodes = computed(() => {
           ((a.net_out ?? 0) + (a.net_in ?? 0))
           - ((b.net_out ?? 0) + (b.net_in ?? 0))
         )
+      case 'rate':
+        return dir * (
+          ((a.net_out ?? 0) + (a.net_in ?? 0))
+          - ((b.net_out ?? 0) + (b.net_in ?? 0))
+        )
       default:
         return 0
     }
@@ -339,6 +344,7 @@ const columnTitles: Record<string, string> = {
   mem: '内存',
   disk: '硬盘',
   traffic: '流量',
+  rate: '速率',
 }
 </script>
 
@@ -469,10 +475,11 @@ const columnTitles: Record<string, string> = {
             <!-- CPU -->
             <div v-else-if="col === 'cpu'" class="node-list-item__cpu" :style="getColumnStyle('cpu')">
               <div class="flex flex-col gap-0.5">
-                <div class="text-xs flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
+                <div class="text-[11px] flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
                   <NText>{{ (node.cpu ?? 0).toFixed(1) }}%</NText>
+                  <div class="flex-1" />
                   <NText :depth="3">
-                    ({{ node.load.toFixed(2) ?? 0 }}, {{ node.load5.toFixed(2) ?? 0 }}, {{ node.load15.toFixed(2) ?? 0 }})
+                    {{ node.load.toFixed(2) ?? 0 }}, {{ node.load5.toFixed(2) ?? 0 }}, {{ node.load15.toFixed(2) ?? 0 }}
                   </NText>
                 </div>
                 <NProgress :show-indicator="false" :percentage="node.cpu ?? 0" :status="getStatus(node.cpu ?? 0)" :height="4" />
@@ -482,10 +489,11 @@ const columnTitles: Record<string, string> = {
             <!-- 内存 -->
             <div v-else-if="col === 'mem'" class="node-list-item__mem" :style="getColumnStyle('mem')">
               <div class="flex flex-col gap-0.5">
-                <div class="text-xs flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
+                <div class="text-[11px] flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
                   <NText>{{ ((node.ram ?? 0) / (node.mem_total || 1) * 100).toFixed(1) }}%</NText>
+                  <div class="flex-1" />
                   <NText :depth="3">
-                    ({{ formatBytes(node.ram ?? 0) }} / {{ formatBytes(node.mem_total ?? 0) }})
+                    {{ formatBytes(node.ram ?? 0) }} / {{ formatBytes(node.mem_total ?? 0) }}
                   </NText>
                 </div>
                 <NProgress :show-indicator="false" :percentage="(node.ram ?? 0) / (node.mem_total || 1) * 100" :status="getStatus((node.ram ?? 0) / (node.mem_total || 1) * 100)" :height="4" />
@@ -495,61 +503,57 @@ const columnTitles: Record<string, string> = {
             <!-- 硬盘 -->
             <div v-else-if="col === 'disk'" class="node-list-item__disk" :style="getColumnStyle('disk')">
               <div class="flex flex-col gap-0.5">
-                <div class="text-xs flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
+                <div class="text-[11px] flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
                   <NText>{{ ((node.disk ?? 0) / (node.disk_total || 1) * 100).toFixed(1) }}%</NText>
+                  <div class="flex-1" />
                   <NText :depth="3">
-                    ({{ formatBytes(node.disk ?? 0) }} / {{ formatBytes(node.disk_total ?? 0) }})
+                    {{ formatBytes(node.disk ?? 0) }} / {{ formatBytes(node.disk_total ?? 0) }}
                   </NText>
                 </div>
                 <NProgress :show-indicator="false" :percentage="(node.disk ?? 0) / (node.disk_total || 1) * 100" :status="getStatus((node.disk ?? 0) / (node.disk_total || 1) * 100)" :height="4" />
               </div>
             </div>
 
+            <!-- 速率 -->
+            <div v-else-if="col === 'rate'" class="node-list-item__rate" :style="getColumnStyle('rate')">
+              <div class="text-[11px] flex flex-col gap-1" :style="{ fontFamily: appStore.numberFontFamily }">
+                <NText>
+                  <span :style="{ color: themeVars.successColor }">↑{{ formatBytesPerSecond(node.net_out ?? 0) }}</span>
+                </NText>
+                <NText>
+                  <span :style="{ color: themeVars.infoColor }">↓{{ formatBytesPerSecond(node.net_in ?? 0) }}</span>
+                </NText>
+              </div>
+            </div>
+
             <!-- 流量 -->
             <div v-else-if="col === 'traffic'" class="node-list-item__traffic" :style="getColumnStyle('traffic')">
               <div class="traffic-cell">
-                <!-- 有流量限制时显示进度条版式 -->
-                <template v-if="showTrafficProgress(node)">
-                  <NTooltip :trigger="isTouchDevice ? 'click' : 'hover'">
-                    <template #trigger>
-                      <div class="flex flex-col gap-0.5 w-full" :class="{ 'cursor-help': !isTouchDevice }" @click.stop>
-                        <div class="text-xs flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
-                          <NText>{{ getTrafficUsedPercentage(node).toFixed(1) }}%</NText>
-                          <NText :depth="3">
-                            ({{ formatBytes(getTrafficUsed(node)) }} / {{ formatBytes(node.traffic_limit) }})
-                          </NText>
-                        </div>
-                        <!-- 统一使用 TrafficProgress 组件，自动根据类型选择颜色 -->
-                        <TrafficProgress
-                          :upload="node.net_total_up ?? 0"
-                          :download="node.net_total_down ?? 0"
-                          :traffic-limit="node.traffic_limit"
-                          :traffic-limit-type="(node.traffic_limit_type || 'sum')"
-                          height="4px"
-                        />
+                <NTooltip :trigger="isTouchDevice ? 'click' : 'hover'">
+                  <template #trigger>
+                    <div class="flex flex-col gap-0.5 w-full" :class="{ 'cursor-help': !isTouchDevice }" @click.stop>
+                      <div class="text-[11px] flex gap-1 items-center" :style="{ fontFamily: appStore.numberFontFamily }">
+                        <NText v-if="showTrafficProgress(node)">{{ getTrafficUsedPercentage(node).toFixed(1) }}%</NText>
+                        <div class="flex-1" />
+                        <NText :depth="3">
+                          {{ formatBytes(getTrafficUsed(node)) }} / <template v-if="showTrafficProgress(node)">{{ formatBytes(node.traffic_limit) }}</template><template v-else>∞</template>
+                        </NText>
                       </div>
-                    </template>
-                    <div class="text-xs flex flex-col gap-1" :style="{ fontFamily: appStore.numberFontFamily }">
-                      <span><span :style="{ color: themeVars.successColor }">↑{{ formatBytesPerSecond(node.net_out ?? 0) }}</span> <span style="opacity: 0.6;">({{ formatBytes(node.net_total_up ?? 0) }})</span></span>
-                      <span><span :style="{ color: themeVars.infoColor }">↓{{ formatBytesPerSecond(node.net_in ?? 0) }}</span> <span style="opacity: 0.6;">({{ formatBytes(node.net_total_down ?? 0) }})</span></span>
+                      <!-- 统一使用 TrafficProgress 组件，自动根据类型选择颜色 -->
+                      <TrafficProgress
+                        :upload="node.net_total_up ?? 0"
+                        :download="node.net_total_down ?? 0"
+                        :traffic-limit="node.traffic_limit"
+                        :traffic-limit-type="(node.traffic_limit_type || 'sum')"
+                        height="4px"
+                      />
                     </div>
-                  </NTooltip>
-                </template>
-                <!-- 无流量限制时保持现有版式 -->
-                <template v-else>
-                  <div class="text-xs flex flex-col gap-1" :style="{ fontFamily: appStore.numberFontFamily }">
-                    <NText>
-                      <span :style="{ color: themeVars.successColor }">↑{{ formatBytesPerSecond(node.net_out ?? 0) }}</span> <NText :depth="3">
-                        ({{ formatBytes(node.net_total_up ?? 0) }})
-                      </NText>
-                    </NText>
-                    <NText>
-                      <span :style="{ color: themeVars.infoColor }">↓{{ formatBytesPerSecond(node.net_in ?? 0) }}</span><NText :depth="3">
-                        ({{ formatBytes(node.net_total_down ?? 0) }})
-                      </NText>
-                    </NText>
+                  </template>
+                  <div class="text-[11px] flex flex-col gap-1" :style="{ fontFamily: appStore.numberFontFamily }">
+                    <span><span :style="{ color: themeVars.successColor }">↑</span> {{ formatBytes(node.net_total_up ?? 0) }}</span>
+                    <span><span :style="{ color: themeVars.infoColor }">↓</span> {{ formatBytes(node.net_total_down ?? 0) }}</span>
                   </div>
-                </template>
+                </NTooltip>
               </div>
             </div>
           </template>
@@ -737,6 +741,11 @@ const columnTitles: Record<string, string> = {
 
 .node-list-header__traffic,
 .node-list-item__traffic {
+  min-width: 0;
+}
+
+.node-list-header__rate,
+.node-list-item__rate {
   min-width: 0;
 }
 
